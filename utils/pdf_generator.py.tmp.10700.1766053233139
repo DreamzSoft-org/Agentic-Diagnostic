@@ -1,0 +1,281 @@
+from fpdf import FPDF
+from datetime import datetime
+import os
+import textwrap
+
+class PDFReportGenerator:
+    def __init__(self):
+        pass
+
+    def generate_pdf_report(self, report_content, patient_info=None):
+        """
+        Generate a PDF report from the diagnostic analysis
+
+        Args:
+            report_content (str): The formatted diagnostic report content
+            patient_info (dict): Optional patient information dictionary
+
+        Returns:
+            bytes: PDF file content as bytes
+        """
+        try:
+            # Create a new PDF document
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=20)
+            pdf.add_page()
+
+            # Set margins and calculate effective width
+            pdf.set_margins(20, 20, 20)
+            effective_width = pdf.w - 2 * pdf.l_margin  # Page width minus margins
+
+            # Professional header
+            pdf.set_font("Arial", "B", 18)
+            pdf.set_fill_color(230, 230, 250)  # Light lavender background for header
+            pdf.cell(effective_width, 12, "MEDICAL DIAGNOSTIC REPORT", 0, 1, 'C', True)
+            pdf.ln(5)
+
+            # Add patient info in a structured format
+            if patient_info:
+                pdf.set_font("Arial", "B", 12)
+                pdf.set_fill_color(240, 240, 240)  # Light gray background for section headers
+                pdf.cell(effective_width, 8, "PATIENT INFORMATION", 0, 1, 'L', True)
+                pdf.ln(2)
+
+                pdf.set_font("Arial", "", 10)
+
+                # Format patient info in a table-like structure
+                for key, value in patient_info.items():
+                    safe_key = str(key).replace('_', ' ').title()
+                    safe_val = str(value)
+                    text = f"{safe_key}: {safe_val}"
+
+                    # Ensure text is compatible with PDF
+                    try:
+                        safe_text = text.encode('ascii', 'ignore').decode('ascii')
+                    except Exception:
+                        safe_text = repr(text).encode('ascii', 'ignore').decode('ascii')
+
+                    # Add indentation for better structure
+                    pdf.cell(10, 6, "", 0, 0)  # Indentation
+                    pdf.cell(effective_width - 10, 6, safe_text, 0, 1, 'L')
+
+                pdf.ln(5)
+
+            # Add generated timestamp
+            pdf.set_font("Arial", "I", 9)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            timestamp_text = f"Generated: {timestamp}"
+            try:
+                safe_timestamp = timestamp_text.encode('ascii', 'ignore').decode('ascii')
+            except Exception:
+                safe_timestamp = repr(timestamp_text).encode('ascii', 'ignore').decode('ascii')
+
+            # Right-align the timestamp
+            pdf.cell(effective_width, 5, safe_timestamp, 0, 1, 'R')
+            pdf.ln(5)
+
+            # Process and format the report content with better structure
+            pdf.set_font("Arial", "", 10)
+
+            # Split report content into lines
+            lines = report_content.split('\n')
+
+            # Track current section for better formatting
+            in_list = False
+            list_indent = 15  # Indent for list items
+
+            for line in lines:
+                # Clean the line to remove problematic characters and formatting symbols
+                clean_line = (line
+                             .replace('•', '- ')
+                             .replace('→', ' -> ')
+                             .replace('≥', ' >= ')
+                             .replace('≤', ' <= ')
+                             .replace('α', 'a')
+                             .replace('β', 'b')
+                             .replace('γ', 'g')
+                             .replace('–', '-')
+                             .replace('—', '-')
+                             .replace('"', '"')
+                             .replace('"', '"')
+                             .replace("'", "'")
+                             .replace("'", "'")
+                             .replace('#', '')  # Remove hash symbols
+                             .replace('*', '')  # Remove asterisks
+                             .strip())  # Remove leading/trailing whitespace after replacements
+
+                # Encode text to be PDF-compatible - use ASCII to avoid problematic characters
+                try:
+                    safe_line = clean_line.encode('ascii', 'ignore').decode('ascii')
+                except Exception:
+                    safe_line = repr(clean_line).encode('ascii', 'ignore').decode('ascii')
+
+                if not safe_line.strip():
+                    pdf.ln(4)  # Add some space for blank lines
+                    continue
+
+                # Skip formatting lines
+                if line.startswith('======='):
+                    continue
+
+                # Process markdown-style headers (like ##, ###, etc.) and section headers
+                line_width = pdf.w - 2 * pdf.l_margin  # Page width minus margins
+                stripped_line = safe_line.strip()
+
+                # Check for markdown headers (## Header, ### Header, etc.)
+                if stripped_line.startswith(('##', '###', '====', '----')):
+                    if stripped_line.startswith('##'):
+                        header_text = stripped_line[2:].strip()  # Remove '##'
+                    elif stripped_line.startswith('###'):
+                        header_text = stripped_line[3:].strip()  # Remove '###'
+                    elif stripped_line.startswith('===='):
+                        header_text = safe_line.split('\n')[0] if '\n' in safe_line else safe_line  # Handle underline headers
+                        header_text = header_text.strip()
+                    elif stripped_line.startswith('----'):
+                        header_text = safe_line.split('\n')[0] if '\n' in safe_line else safe_line  # Handle underline headers
+                        header_text = header_text.strip()
+                    else:
+                        # For = and - style headers
+                        header_text = safe_line.strip('=').strip('-').strip('*').strip()
+
+                    if header_text and len(header_text) < 100:  # Make sure it's a real header, not just symbols
+                        pdf.ln(3)  # Add space before header
+                        pdf.set_font("Arial", "B", 12)
+                        pdf.set_fill_color(240, 240, 240)  # Light gray background
+                        # Ensure header text fits within page width
+                        display_header = header_text[:int(line_width / 2)] if len(header_text) > int(line_width / 2) else header_text  # Truncate if too long
+                        pdf.cell(line_width, 8, display_header, 0, 1, 'L', True)
+                        pdf.set_font("Arial", "", 10)
+                        pdf.set_fill_color(255, 255, 255)  # Reset to white
+                        in_list = False  # Reset list state when we encounter a header
+                    continue
+                # Check for traditional section headers (lines starting with =, -, *)
+                elif line.startswith(('=', '-', '*')) and len(line) > 5 and line.strip() != line:
+                    header_text = safe_line.strip('=').strip('-').strip('*').strip().upper()
+                    if header_text and len(header_text) < 100:  # Make sure it's a real header
+                        pdf.ln(3)  # Add space before header
+                        pdf.set_font("Arial", "B", 12)
+                        pdf.set_fill_color(240, 240, 240)  # Light gray background
+                        # Ensure header text fits within page width
+                        display_header = header_text[:int(line_width / 2)] if len(header_text) > int(line_width / 2) else header_text  # Truncate if too long
+                        pdf.cell(line_width, 8, display_header, 0, 1, 'L', True)
+                        pdf.set_font("Arial", "", 10)
+                        pdf.set_fill_color(255, 255, 255)  # Reset to white
+                        in_list = False  # Reset list state when we encounter a header
+                    continue
+
+                # Check if it's a list item (starts with dash, number, or bullet)
+                is_list_item = safe_line.strip().startswith(('-', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '* ', '- '))
+
+                if is_list_item:
+                    if not in_list:
+                        pdf.ln(2)  # Add space before list starts
+                        in_list = True
+                    # Add indentation for list items
+                    pdf.cell(list_indent, 6, "", 0, 0)  # Indentation space
+                    try:
+                        pdf.cell(line_width - list_indent, 6, safe_line, 0, 1, 'L')
+                    except:
+                        # Fallback for problematic list items
+                        short_line = safe_line[:60] if len(safe_line) > 60 else safe_line
+                        pdf.cell(line_width - list_indent, 6, short_line, 0, 1, 'L')
+                else:
+                    if in_list:
+                        pdf.ln(2)  # Add space after list ends
+                        in_list = False
+                    # Add the line with proper formatting
+                    # Calculate effective page width for text
+                    line_width = pdf.w - 2 * pdf.l_margin  # Page width minus margins
+
+                    # Check if the line might be problematic (too long for page)
+                    if len(safe_line) > 0:
+                        # Use a more robust approach to handle text that might cause "not enough horizontal space" error
+                        # First, let's ensure the text is properly formatted and not too long
+                        clean_safe_line = safe_line.strip()
+
+                        # If the line is extremely long, break it into smaller parts
+                        if len(clean_safe_line) > 100:
+                            # Break into smaller segments to avoid the horizontal space error
+                            for i in range(0, len(clean_safe_line), 80):
+                                segment = clean_safe_line[i:i+80]
+                                try:
+                                    pdf.set_font("Arial", "", 10)
+                                    pdf.cell(10, 6, "", 0, 0)  # Left margin
+                                    pdf.multi_cell(w=line_width - 10, h=6, txt=segment, border=0, align='L')
+                                except:
+                                    # If still failing, try with even shorter segments
+                                    try:
+                                        short_segment = segment[:40] if len(segment) > 40 else segment
+                                        pdf.cell(10, 6, "", 0, 0)  # Left margin
+                                        pdf.multi_cell(w=line_width - 10, h=6, txt=short_segment, border=0, align='L')
+                                    except:
+                                        # Final fallback - write error indicator
+                                        pdf.cell(10, 6, "", 0, 0)  # Left margin
+                                        pdf.cell(w=line_width - 10, h=6, txt="[TEXT OMITTED - FORMATTING ISSUE]", border=0, ln=1, align='L')
+                                        break  # Skip the rest to avoid repeated errors
+                        else:
+                            # For shorter lines, try the normal approach
+                            try:
+                                pdf.set_font("Arial", "", 10)
+                                pdf.cell(10, 6, "", 0, 0)  # Left margin
+                                pdf.multi_cell(w=line_width - 10, h=6, txt=clean_safe_line, border=0, align='L')
+                            except:
+                                # If normal approach fails, try with shorter text
+                                try:
+                                    short_line = clean_safe_line[:50] if len(clean_safe_line) > 50 else clean_safe_line
+                                    pdf.cell(10, 6, "", 0, 0)  # Left margin
+                                    pdf.multi_cell(w=line_width - 10, h=6, txt=short_line, border=0, align='L')
+                                except:
+                                    # If that fails, use cell with even more aggressive shortening
+                                    try:
+                                        very_short = clean_safe_line[:20] if len(clean_safe_line) > 20 else clean_safe_line
+                                        pdf.cell(w=line_width, h=6, txt=very_short, border=0, ln=1, align='L')
+                                    except:
+                                        # Ultimate fallback
+                                        pdf.cell(w=line_width, h=6, txt="[FORMATTING ERROR]", border=0, ln=1, align='L')
+
+        except Exception as e:
+            print(f"Error generating PDF: {e}")
+            # Return an error indicator or handle gracefully
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_margins(20, 20, 20)
+            effective_width = pdf.w - 2 * pdf.l_margin  # Page width minus margins
+            pdf.set_font("Arial", "B", 14)
+            pdf.set_fill_color(255, 200, 200)  # Light red background for error
+            pdf.cell(effective_width, 10, "ERROR GENERATING REPORT", 0, 1, 'C', True)
+            pdf.set_font("Arial", "", 12)
+            pdf.set_fill_color(255, 255, 255)  # Reset to white
+            pdf.ln(10)
+            # Also wrap the error message itself
+            pdf.multi_cell(effective_width, 8, f"Error: {str(e)}", 0, 'L')
+
+        # Return PDF as bytes
+        return pdf.output()
+
+    def save_pdf_to_file(self, report_content, patient_info=None, file_path=None):
+        """
+        Save the PDF report to a file
+
+        Args:
+            report_content (str): The formatted diagnostic report content
+            patient_info (dict): Optional patient information dictionary
+            file_path (str): Path to save the PDF file (optional)
+
+        Returns:
+            str: Path to saved PDF file
+        """
+        if not file_path:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"diagnostic_report_{timestamp}.pdf"
+            file_path = os.path.join("static", "reports", filename)
+
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        pdf_bytes = self.generate_pdf_report(report_content, patient_info)
+
+        with open(file_path, 'wb') as f:
+            f.write(pdf_bytes)
+
+        return file_path
