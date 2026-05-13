@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from PIL import Image
+from pydantic.v1.fields import FieldInfo as FieldInfoV1
 import pydicom
 import io
 import os
