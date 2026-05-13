@@ -29,3 +29,4 @@ fpdf2
 markdown-it-py
 weasyprint
 markdown2
+pytesseract

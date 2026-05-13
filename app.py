@@ -13,7 +13,7 @@ from utils.data_parser import MedicalDataParser
 
 # Page configuration
 st.set_page_config(
-    page_title="Medical Diagnostic Agent",
+    page_title="Smart Clinic Diagnostic Agent",
     page_icon="🏥",
     layout="wide"
 )
@@ -56,7 +56,16 @@ def main():
         st.warning("CSS file not found. Using default styling.")
 
     # Header
-    st.markdown('<div class="header"><h1>🏥 Advanced Clinical Diagnostic Agent</h1><p>AI-powered medical data analysis & diagnostic assistance</p></div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([0.5, 3, 0.5])
+    with col1:
+        st.write(' ')
+    
+    with col2:
+        st.image("smile-red-1.png", width="content")
+
+    with col3:
+        st.write(' ')
+    #st.markdown('<div class="header"><h1>🏥 Advanced Clinical Diagnostic Agent</h1><p>AI-powered medical data analysis & diagnostic assistance</p></div>', unsafe_allow_html=True)
 
     # Initialize components
     file_handler = FileHandler()
@@ -280,11 +289,30 @@ def main():
                 key="pdf_download_final"
             )
 
+            # Cloud Healthcare API Section
+            #st.markdown("---")
+            #st.markdown("**Cloud Healthcare Integration**")
+            
+            #if not gcp_handler.available:
+            #    st.info("💡 Cloud Healthcare API is not configured. Add your GCP credentials to the `.env` file to enable cloud storage.")
+            #else:
+            #    if st.button("☁️ Upload Report to Google Cloud Healthcare API", key="gcp_upload_btn"):
+            #        with st.spinner("Uploading to Google Cloud..."):
+            #            res = gcp_handler.store_diagnostic_report(
+            #                patient_id=st.session_state.patient_id or "unknown",
+            #                report_text=report_content,
+            #                diagnosis=results.get("summary", "No summary")
+            #            )
+            #            if "success" in res:
+            #                st.success(f"Successfully uploaded to FHIR Store! Resource: {res['name']}")
+            #            else:
+            #                st.error(f"Upload failed: {res.get('error')}")
+
     # Close the diagnostic results section div
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Footer
-    st.markdown('<div class="footer"><p>🏥 Advanced Clinical Diagnostic Agent v1.0 | AI-Powered Medical Analysis</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer"><p>🏥 Smart Clinical Agent v1.0 | AI-Powered Diagnostics</p></div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
