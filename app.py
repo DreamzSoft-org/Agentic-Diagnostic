@@ -61,8 +61,8 @@ def main():
         st.write(' ')
     
     with col2:
-        st.image("smile-red-1.png", width="content")
-
+        st.image("smile-ihs.png", width="content")
+        
     with col3:
         st.write(' ')
     #st.markdown('<div class="header"><h1>🏥 Advanced Clinical Diagnostic Agent</h1><p>AI-powered medical data analysis & diagnostic assistance</p></div>', unsafe_allow_html=True)
